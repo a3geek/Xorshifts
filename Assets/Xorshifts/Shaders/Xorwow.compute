@@ -1,0 +1,82 @@
+﻿#pragma kernel Initialize
+#pragma kernel Xorwow
+
+#define ThreadX 1024
+
+struct State
+{
+    uint X;
+    uint Y;
+    uint Z;
+    uint W;
+    uint V;
+    uint D;
+};
+
+struct InitInfo
+{
+    uint Max;
+    uint Seed;
+};
+
+RWStructuredBuffer<State> _States;
+StructuredBuffer<InitInfo> _InitInfo;
+RWBuffer<uint> _Rands;
+
+// Single iteration of Bob Jenkins's One-At-A-Time hashing algorithm.
+uint BobJenkinsHash(uint x) {
+    x += (x << 10u);
+    x ^= (x >> 6u);
+    x += (x << 3u);
+    x ^= (x >> 11u);
+    x += (x << 15u);
+    return x;
+}
+
+[numthreads(ThreadX, 1, 1)]
+void Initialize(uint3 dispatchThreadID : SV_DispatchThreadID, uint3 groupThreadID : SV_GroupThreadID, uint3 groupID : SV_GroupID)
+{
+    InitInfo info = _InitInfo[0u];
+    uint id = dispatchThreadID.x + dispatchThreadID.y * groupID.x;
+    if (id >= info.Max)
+    {
+        return;
+    }
+    
+    uint ido = id + 1u;
+    State s;
+    s.X = BobJenkinsHash(ido * info.Seed ^ ido);
+    s.Y = BobJenkinsHash((ido + info.Seed) ^ s.X * ido);
+    s.Z = BobJenkinsHash(s.X ^ s.Y * ido);
+    s.W = BobJenkinsHash(s.Y ^ s.Z * ido);
+    s.V = BobJenkinsHash(s.Z ^ s.W * ido);
+    s.D = BobJenkinsHash(s.W ^ s.V * ido);
+
+    _States[id] = s;
+}
+
+[numthreads(ThreadX, 1, 1)]
+void Xorwow(uint3 dispatchThreadID : SV_DispatchThreadID, uint3 groupThreadID : SV_GroupThreadID, uint3 groupID : SV_GroupID)
+{
+    InitInfo info = _InitInfo[0u];
+    uint id = dispatchThreadID.x + dispatchThreadID.y * groupID.x;
+    if (id >= info.Max)
+    {
+        return;
+    }
+    
+    State state = _States[id];
+
+    uint t = state.X ^ (state.X >> 2);
+
+    state.X = state.Y;
+    state.Y = state.Z;
+    state.Z = state.W;
+    state.W = state.V;
+
+    state.V = state.V ^ (state.V << 4) ^ t ^ (t << 1);
+    state.D += 362437u;
+    
+    _Rands[id] = state.D + state.V;
+    _States[id] = state;
+}
