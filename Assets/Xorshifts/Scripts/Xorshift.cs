@@ -1,100 +1,62 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using System;
+﻿using System;
 
 namespace Xorshifts
 {
-    using static Utilities.RandomExtensions;
+    using static Classes.Extensions;
 
     public static class Xorshift
     {
-        public static uint Generate32(ref uint state)
+        private static State128 State = new()
         {
-            CheckZeroValue(ref state);
+            X = RandomUInt(),
+            Y = RandomUInt(),
+            Z = RandomUInt(),
+            W = RandomUInt()
+        };
+        private static uint State32 = RandomUInt();
+        private static ulong State64 = RandomULong();
 
-            state ^= state << 13;
-            state = state >> 17;
-            return state ^= state << 5;
+
+        public static uint Generate32()
+        {
+            State32 ^= State32 << 13;
+            State32 >>= 17;
+            return State32 ^= State32 << 5;
         }
 
-        public static ulong Generate64(ref ulong state)
+        public static ulong Generate64()
         {
-            CheckZeroValue(ref state);
-
-            state ^= state << 13;
-            state ^= state >> 7;
-            return state ^= state << 17;
+            State64 ^= State64 << 13;
+            State64 ^= State64 >> 7;
+            return State64 ^= State64 << 17;
         }
 
-        public static uint Generate128(ref State128 state)
+        public static uint Generate128()
         {
-            state.Check();
+            var t = State.X ^ (State.X << 11);
+            State.X = State.Y;
+            State.Y = State.Z;
+            State.Z = State.W;
 
-            var t = state.X ^ (state.X << 11);
-
-            state.X = state.Y;
-            state.Y = state.Z;
-            state.Z = state.W;
-
-            return state.W = state.W ^ (state.W >> 19) ^ t ^ (t >> 8);
+            return State.W = State.W ^ (State.W >> 19) ^ t ^ (t >> 8);
         }
 
 
-        #region "State"
-        [Serializable]
-        public struct State128
+        private struct State128
         {
-            public uint this[int index]
+            public readonly uint this[int index] => index switch
             {
-                get
-                {
-                    switch(index)
-                    {
-                        case 0: return this.X;
-                        case 1: return this.Y;
-                        case 2: return this.Z;
-                        case 3: return this.W;
-                    }
-
-                    throw new IndexOutOfRangeException();
-                }
-                set
-                {
-                    switch(index)
-                    {
-                        case 0:
-                            this.X = value;
-                            return;
-                        case 1:
-                            this.Y = value;
-                            return;
-                        case 2:
-                            this.Z = value;
-                            return;
-                        case 3:
-                            this.W = value;
-                            return;
-                    }
-
-                    throw new IndexOutOfRangeException();
-                }
-            }
+                0 => this.X,
+                1 => this.Y,
+                2 => this.Z,
+                3 => this.W,
+                _ => throw new IndexOutOfRangeException(),
+            };
 
             public uint X;
             public uint Y;
             public uint Z;
             public uint W;
-
-
-            public void Check()
-            {
-                CheckZeroValue(ref this.X);
-                CheckZeroValue(ref this.Y);
-                CheckZeroValue(ref this.Z);
-                CheckZeroValue(ref this.W);
-            }
         }
-        #endregion
     }
 }

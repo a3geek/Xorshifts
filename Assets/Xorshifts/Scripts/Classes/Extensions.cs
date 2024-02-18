@@ -1,13 +1,10 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
 
-namespace Xorshifts.Utilities
+namespace Xorshifts.Classes
 {
     using Random = UnityEngine.Random;
 
-    public static class RandomExtensions
+    public static class Extensions
     {
         public static uint RandomUInt()
         {
@@ -23,12 +20,12 @@ namespace Xorshifts.Utilities
             return (body << 32) | tail;
         }
 
-        public static void CheckZeroValue(ref uint state)
+        public static void CheckZero(ref uint state)
         {
             state = state == 0u ? RandomUInt() : state;
         }
 
-        public static void CheckZeroValue(ref ulong state)
+        public static void CheckZero(ref ulong state)
         {
             state = state == 0ul ? RandomULong() : state;
         }

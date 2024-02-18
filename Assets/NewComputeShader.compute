@@ -1,0 +1,15 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+#define NUM_THREADS_X 32
+#define NUM_THREADS_Y 32
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> Result;
+
+[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
+void CSMain (uint3 id : SV_DispatchThreadID, uint3 groupID : SV_GroupID)
+{
+    uint idx = id.x + id.y * groupID.x;
+}

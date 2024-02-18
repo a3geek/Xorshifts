@@ -1,4 +1,4 @@
-﻿#pragma kernel Initialize
+﻿#pragma kernel Init
 #pragma kernel Xorwow
 
 #define ThreadX 1024
@@ -13,15 +13,10 @@ struct State
     uint D;
 };
 
-struct InitInfo
-{
-    uint Max;
-    uint Seed;
-};
-
-RWStructuredBuffer<State> _States;
-StructuredBuffer<InitInfo> _InitInfo;
+uint _Max;
+uint _Seed;
 RWBuffer<uint> _Rands;
+RWStructuredBuffer<State> _States;
 
 // Single iteration of Bob Jenkins's One-At-A-Time hashing algorithm.
 uint BobJenkinsHash(uint x) {
@@ -34,49 +29,44 @@ uint BobJenkinsHash(uint x) {
 }
 
 [numthreads(ThreadX, 1, 1)]
-void Initialize(uint3 dispatchThreadID : SV_DispatchThreadID, uint3 groupThreadID : SV_GroupThreadID, uint3 groupID : SV_GroupID)
+void Init(uint3 id : SV_DispatchThreadID)
 {
-    InitInfo info = _InitInfo[0u];
-    uint id = dispatchThreadID.x + dispatchThreadID.y * groupID.x;
-    if (id >= info.Max)
+    uint idx = id.x;
+    if (idx >= _Max)
     {
         return;
     }
-    
-    uint ido = id + 1u;
-    State s;
-    s.X = BobJenkinsHash(ido * info.Seed ^ ido);
-    s.Y = BobJenkinsHash((ido + info.Seed) ^ s.X * ido);
-    s.Z = BobJenkinsHash(s.X ^ s.Y * ido);
-    s.W = BobJenkinsHash(s.Y ^ s.Z * ido);
-    s.V = BobJenkinsHash(s.Z ^ s.W * ido);
-    s.D = BobJenkinsHash(s.W ^ s.V * ido);
 
-    _States[id] = s;
+    State s;
+    s.X = BobJenkinsHash(idx * _Seed ^ idx);
+    s.Y = BobJenkinsHash((idx + _Seed) ^ s.X * idx);
+    s.Z = BobJenkinsHash(s.X ^ s.Y * idx);
+    s.W = BobJenkinsHash(s.Y ^ s.Z * idx);
+    s.V = BobJenkinsHash(s.Z ^ s.W * idx);
+    s.D = BobJenkinsHash(s.W ^ s.V * idx);
+
+    _States[idx] = s;
 }
 
 [numthreads(ThreadX, 1, 1)]
-void Xorwow(uint3 dispatchThreadID : SV_DispatchThreadID, uint3 groupThreadID : SV_GroupThreadID, uint3 groupID : SV_GroupID)
+void Xorwow(uint3 id : SV_DispatchThreadID)
 {
-    InitInfo info = _InitInfo[0u];
-    uint id = dispatchThreadID.x + dispatchThreadID.y * groupID.x;
-    if (id >= info.Max)
+    uint idx = id.x;
+    if (idx >= _Max)
     {
         return;
     }
     
-    State state = _States[id];
+    State state = _States[idx];
 
     uint t = state.X ^ (state.X >> 2);
-
     state.X = state.Y;
     state.Y = state.Z;
     state.Z = state.W;
     state.W = state.V;
-
     state.V = state.V ^ (state.V << 4) ^ t ^ (t << 1);
     state.D += 362437u;
     
-    _Rands[id] = state.D + state.V;
-    _States[id] = state;
+    _Rands[idx] = state.D + state.V;
+    _States[idx] = state;
 }

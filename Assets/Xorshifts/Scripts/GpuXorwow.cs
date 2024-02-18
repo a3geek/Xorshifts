@@ -1,87 +1,74 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace Xorshifts
 {
-    using static Utilities.RandomExtensions;
+    using Classes;
+    using Random = UnityEngine.Random;
 
-    [AddComponentMenu("")]
-    public class GpuXorwow : MonoBehaviour
+    [Serializable]
+    public class GpuXorwow : MonoBehaviour, IDisposable
     {
-        public const int ThreadX = 1024;
-        public const string PropRands = "_Rands";
-        public const string PropStates = "_States";
-        public const string PropInitInfo = "_InitInfo";
+        private const string InitKernel = "Init";
+        private const string XorwowKernel = "Xorwow";
+        private static readonly int PropMax = Shader.PropertyToID("_Max");
+        private static readonly int PropSeed = Shader.PropertyToID("_Seed");
+        private static readonly int PropRands = Shader.PropertyToID("_Rands");
+        private static readonly int PropStates = Shader.PropertyToID("_States");
 
-        public int Count
-        {
-            get { return this.count; }
-            set { this.count = Mathf.Max(1, value); }
-        }
-        public ComputeBuffer RandsBuffer
-        {
-            get; private set;
-        }
+        public bool Inited { get; private set; } = false;
+        public GraphicsBuffer Rands { get; private set; } = null;
 
-        [SerializeField, Range(1, 32767)]
-        private int count = 100;
         [SerializeField]
         private ComputeShader cs = null;
 
-        private ComputeBuffer statesBuffer = null;
-        private ComputeBuffer initInfoBuffer = null;
+        private Dispatcher init = null;
+        private Dispatcher xorwow = null;
+        private GraphicsBuffer states = null;
 
-        
-        public void Initialize()
+
+        public void Initialize(int count)
         {
-            this.OnDestroy();
+            this.Rands ??= new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured, count, Marshal.SizeOf(typeof(uint))
+            );
+            this.states ??= new GraphicsBuffer(
+                GraphicsBuffer.Target.Structured, count, Marshal.SizeOf(typeof(Xorwow.States))
+            );
 
-            this.RandsBuffer = new ComputeBuffer(this.count, Marshal.SizeOf(typeof(uint)), ComputeBufferType.Default);
-            this.statesBuffer = new ComputeBuffer(this.count, Marshal.SizeOf(typeof(Xorwow.State)), ComputeBufferType.Default);
-            this.initInfoBuffer = new ComputeBuffer(1, Marshal.SizeOf(typeof(InitInfo)), ComputeBufferType.Default);
-            this.initInfoBuffer.SetData(new InitInfo[]
-            {
-                new InitInfo()
-                {
-                    Max = Convert.ToUInt32(this.count),
-                    Seed = RandomUInt()
-                }
-            });
+            this.init ??= new Dispatcher(this.cs, InitKernel, count);
+            this.xorwow ??= new Dispatcher(this.cs, XorwowKernel, count);
 
-            this.cs.SetBuffer(0, PropStates, this.statesBuffer);
-            this.cs.SetBuffer(0, PropInitInfo, this.initInfoBuffer);
-            this.cs.Dispatch(0, Mathf.CeilToInt(this.count / (float)ThreadX), 1, 1);
+            this.cs.SetInt(PropMax, count);
+            this.cs.SetInt(PropSeed, Random.Range(int.MinValue, int.MaxValue));
+            this.cs.SetBuffer(this.init.Kernel, PropStates, this.states);
+            this.cs.SetBuffer(this.xorwow.Kernel, PropStates, this.states);
+            this.cs.SetBuffer(this.xorwow.Kernel, PropRands, this.Rands);
 
-            this.cs.SetBuffer(1, PropRands, this.RandsBuffer);
-            this.cs.SetBuffer(1, PropStates, this.statesBuffer);
-            this.cs.SetBuffer(1, PropInitInfo, this.initInfoBuffer);
+            this.init.Dispatch(this.cs);
+            this.Inited = true;
         }
 
         public void Generate()
         {
-            if(this.RandsBuffer == null)
+            if(!this.Inited)
             {
-                this.Initialize();
+                return;
             }
 
-            this.cs.Dispatch(1, Mathf.CeilToInt(this.count / (float)ThreadX), 1, 1);
-        }
-        
-        private void OnDestroy()
-        {
-            this.RandsBuffer?.Dispose();
-            this.statesBuffer?.Dispose();
-            this.initInfoBuffer?.Dispose();
+            this.xorwow.Dispatch(this.cs);
         }
 
-        [Serializable]
-        private struct InitInfo
+        public void Dispose()
         {
-            public uint Max;
-            public uint Seed;
+            this.Rands?.Dispose();
+            this.states?.Dispose();
+        }
+
+        private void OnDestroy()
+        {
+            this.Dispose();
         }
     }
 }
