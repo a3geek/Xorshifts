@@ -14,11 +14,18 @@ xorshiftにはいくつかの派生版が存在する
 CPUで使うならxorshift+  (Google Chromeが2015年に採用)  
 GPUで使うならxorwow  (CUDA Toolkit : cuRAND Libraryが採用)  
 
+### UPM
+````
+https://github.com/a3geek/Xorshifts.git?path=Packages/com.a3geek.xorshifts
+````
+
+
 ## 実装済
 CPU
 - xorshift
-- xorwow
 - xorshift+
+- xorshift*
+- xorwow
 
 GPU
 - xorwow
