@@ -1,7 +1,7 @@
 ﻿#pragma kernel Init
 #pragma kernel Xorwow
 
-#define ThreadX 1024
+#define ThreadX 64
 
 struct State
 {
